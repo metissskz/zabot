@@ -1,117 +1,127 @@
-from aiogram import types, F, Router
+from aiogram import Router, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from states import FenceCalc
 
 router = Router()
 
-main_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="Рассчитать забор")]
-    ],
-    resize_keyboard=True
-)
-
-type_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="Профнастил"), KeyboardButton(text="Блоки")]
-    ],
-    resize_keyboard=True,
-    one_time_keyboard=True
-)
-
-pillar_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="Металл"), KeyboardButton(text="Блоки")]
-    ],
-    resize_keyboard=True,
-    one_time_keyboard=True
-)
-
-foundation_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="Да"), KeyboardButton(text="Нет")]
-    ],
-    resize_keyboard=True,
-    one_time_keyboard=True
-)
+# Кнопки выбора
+def get_keyboard(options):
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=o)] for o in options],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
 
 @router.message(F.text.lower() == "рассчитать забор")
 async def start_calc(message: types.Message, state: FSMContext):
-    await message.answer("Выберите тип забора:", reply_markup=type_keyboard)
+    await message.answer("Выберите тип забора:", reply_markup=get_keyboard(["Профнастил", "Блоки"]))
     await state.set_state(FenceCalc.choosing_type)
 
 @router.message(FenceCalc.choosing_type)
 async def choose_type(message: types.Message, state: FSMContext):
-    await state.update_data(fence_type=message.text.lower())
-    await message.answer("Выберите тип стоек:", reply_markup=pillar_keyboard)
-    await state.set_state(FenceCalc.choosing_pillar)
+    fence_type = message.text.lower()
+    if fence_type not in ["профнастил", "блоки"]:
+        return await message.answer("Пожалуйста, выберите из списка.")
+    await state.update_data(fence_type=fence_type)
+    await message.answer("Стойки будут из:", reply_markup=get_keyboard(["Металл", "Блоки"]))
+    await state.set_state(FenceCalc.choosing_post_type)
 
-@router.message(FenceCalc.choosing_pillar)
-async def choose_pillar(message: types.Message, state: FSMContext):
-    await state.update_data(pillar_type=message.text.lower())
-    await message.answer("Будет ли ленточный фундамент?", reply_markup=foundation_keyboard)
-    await state.set_state(FenceCalc.ask_foundation)
+@router.message(FenceCalc.choosing_post_type)
+async def choose_post_type(message: types.Message, state: FSMContext):
+    post_type = message.text.lower()
+    if post_type not in ["металл", "блоки"]:
+        return await message.answer("Пожалуйста, выберите из списка.")
+    await state.update_data(post_type=post_type)
+    await message.answer("Введите длину забора в метрах:")
+    await state.set_state(FenceCalc.asking_length)
 
-@router.message(FenceCalc.ask_foundation)
-async def ask_foundation(message: types.Message, state: FSMContext):
-    await state.update_data(has_foundation=message.text.lower())
-    if message.text.lower() == "да":
-        await message.answer("Введите размеры фундамента в формате: длина ширина высота (в метрах)")
-        await state.set_state(FenceCalc.entering_foundation_size)
-    else:
-        await message.answer("Введите длину забора в метрах:")
-        await state.set_state(FenceCalc.entering_length)
-
-@router.message(FenceCalc.entering_foundation_size)
-async def enter_foundation_size(message: types.Message, state: FSMContext):
-    try:
-        l, w, h = map(float, message.text.strip().split())
-        concrete_volume = l * w * h
-        await state.update_data(concrete_volume=concrete_volume)
-        await message.answer("Введите длину забора в метрах:")
-        await state.set_state(FenceCalc.entering_length)
-    except Exception:
-        await message.answer("Формат: длина ширина высота, например: 50 0.3 0.5")
-
-@router.message(FenceCalc.entering_length)
-async def enter_length(message: types.Message, state: FSMContext):
+@router.message(FenceCalc.asking_length)
+async def input_length(message: types.Message, state: FSMContext):
     try:
         length = float(message.text)
         await state.update_data(length=length)
         await message.answer("Сколько ворот и калиток нужно?")
-        await state.set_state(FenceCalc.entering_gates)
+        await state.set_state(FenceCalc.asking_gate)
     except ValueError:
-        await message.answer("Введите число в метрах, например: 50")
+        await message.answer("Введите число. Например: 50")
 
-@router.message(FenceCalc.entering_gates)
-async def enter_gates(message: types.Message, state: FSMContext):
+@router.message(FenceCalc.asking_gate)
+async def input_gates(message: types.Message, state: FSMContext):
     try:
         gates = int(message.text)
-        data = await state.get_data()
-        fence_type = data["fence_type"]
-        length = data["length"]
-        pillar_type = data["pillar_type"]
-        concrete_volume = data.get("concrete_volume", 0)
-
-        price_per_meter = {
-            "профнастил": 5000,
-            "блоки": 8000
-        }.get(fence_type, 5000)
-
-        gate_price = 50000
-        concrete_price = 22000  # за м3
-
-        total = length * price_per_meter + gates * gate_price + concrete_volume * concrete_price
-
-        await message.answer(
-            f"Тип: {fence_type}\n"
-            f"Стойки: {pillar_type}\n"
-            f"Длина: {length} м\n"
-            f"Ворота/калитки: {gates}\n"
-            f"Бетон: {concrete_volume:.2f} м³\n\n"
-            f"Итог: {int(total):,} ₸"
-        )
-        await state.clear()
+        await state.update_data(gates=gates)
+        await message.answer("Будет ли ленточный фундамент?", reply_markup=get_keyboard(["Да", "Нет"]))
+        await state.set_state(FenceCalc.asking_foundation)
     except ValueError:
-        await message.answer("Введите целое число — количество ворот/калиток.")
+        await message.answer("Введите целое число. Например: 1")
+
+@router.message(FenceCalc.asking_foundation)
+async def foundation_decision(message: types.Message, state: FSMContext):
+    if message.text.lower() == "да":
+        await message.answer("Введите длину фундамента в метрах:")
+        await state.set_state(FenceCalc.asking_found_length)
+    else:
+        await finish_calc(message, state, include_foundation=False)
+
+@router.message(FenceCalc.asking_found_length)
+async def found_length(message: types.Message, state: FSMContext):
+    try:
+        length = float(message.text)
+        await state.update_data(found_length=length)
+        await message.answer("Введите ширину фундамента в метрах:")
+        await state.set_state(FenceCalc.asking_found_width)
+    except ValueError:
+        await message.answer("Введите число. Например: 30")
+
+@router.message(FenceCalc.asking_found_width)
+async def found_width(message: types.Message, state: FSMContext):
+    try:
+        width = float(message.text)
+        await state.update_data(found_width=width)
+        await message.answer("Введите высоту фундамента в метрах:")
+        await state.set_state(FenceCalc.asking_found_height)
+    except ValueError:
+        await message.answer("Введите число. Например: 0.3")
+
+@router.message(FenceCalc.asking_found_height)
+async def found_height(message: types.Message, state: FSMContext):
+    try:
+        height = float(message.text)
+        await state.update_data(found_height=height)
+        await finish_calc(message, state, include_foundation=True)
+    except ValueError:
+        await message.answer("Введите число. Например: 0.5")
+
+# Финальный расчёт
+async def finish_calc(message: types.Message, state: FSMContext, include_foundation: bool):
+    data = await state.get_data()
+
+    fence_type = data["fence_type"]
+    post_type = data["post_type"]
+    length = data["length"]
+    gates = data["gates"]
+
+    # Цены за метр
+    prices = {
+        "профнастил": 5000,
+        "блоки": 8000
+    }
+    post_price = 3000 if post_type == "металл" else 5000
+    gate_price = 50000
+
+    fence_price = length * prices[fence_type]
+    post_count = int(length / 2.5) + 1
+    posts_total = post_count * post_price
+    gates_total = gates * gate_price
+
+    total = fence_price + posts_total + gates_total
+    result = f"Тип забора: {fence_type}\nДлина: {length} м\nСтойки: {post_type} — {post_count} шт\nВорота/калитки: {gates} шт\n"
+
+    if include_foundation:
+        f_length = data["found_length"]
+        f_width = data["found_width"]
+        f_height = data["found_height"]
+        volume = f_length * f_width * f_height
+        concrete_price_per_m3 = 22000
+        concrete_total = volume * con*_
