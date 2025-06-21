@@ -4,4 +4,3 @@ class FenceCalc(StatesGroup):
     choosing_type = State()
     entering_length = State()
     entering_gates = State()
-    done = State()
