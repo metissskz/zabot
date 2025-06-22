@@ -3,7 +3,10 @@ import os
 from datetime import datetime
 
 def format_currency(value):
-    return f"{int(value):,} ₸".replace(",", " ")
+    try:
+        return f"{int(float(value)):,} ₸".replace(",", " ")
+    except (ValueError, TypeError):
+        return "—"
 
 def generate_pdf(data):
     pdf = FPDF()
@@ -14,11 +17,16 @@ def generate_pdf(data):
     pdf.add_font('DejaVu', 'B', './fonts/DejaVuSans-Bold.ttf', uni=True)
     pdf.set_font('DejaVu', '', 11)
 
+    # Безопасно извлекаем данные
     fence_type = data.get("fence_type", "Не указано")
-    length = float(data.get("length", 0))
+    try:
+        length = float(data.get("length", 0) or 0)
+    except (ValueError, TypeError):
+        length = 0
     has_foundation = data.get("foundation", False)
     slope = data.get("slope", False)
 
+    # Заголовок
     pdf.set_text_color(0, 0, 0)
     pdf.cell(200, 10, txt="Коммерческое предложение", ln=True, align="C")
     pdf.ln(8)
@@ -84,7 +92,7 @@ def generate_pdf(data):
 
     if has_foundation:
         pdf.cell(60, 10, "Бетон", 1, 0)
-        pdf.cell(40, 10, f"{concrete_m3:.2f} м³\xb3", 1, 0)
+        pdf.cell(40, 10, f"{concrete_m3:.2f} м³", 1, 0)
         pdf.cell(40, 10, format_currency(CONCRETE_PRICE_M3), 1, 0)
         pdf.cell(50, 10, format_currency(concrete_total), 1, 1)
 
