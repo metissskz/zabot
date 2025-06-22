@@ -8,19 +8,15 @@ def format_currency(value):
 def generate_pdf(data):
     pdf = FPDF()
     pdf.add_page()
-
-    # Добавление шрифтов
     pdf.add_font('DejaVu', '', './fonts/DejaVuSans.ttf', uni=True)
     pdf.add_font('DejaVu', 'B', './fonts/DejaVuSans-Bold.ttf', uni=True)
     pdf.set_font('DejaVu', '', 11)
 
-    # Получение данных
     fence_type = data.get("fence_type", "Не указано")
     length = float(data.get("length", 0))
     has_foundation = data.get("foundation", False)
     slope = data.get("slope", False)
 
-    # Заголовок
     pdf.set_text_color(0, 0, 0)
     pdf.cell(200, 10, txt="Коммерческое предложение", ln=True, align="C")
     pdf.ln(8)
@@ -92,7 +88,7 @@ def generate_pdf(data):
     pdf.cell(140, 10, "Итого за материалы:", 1)
     pdf.cell(50, 10, format_currency(total_material), 1, 1)
 
-    # Работы
+    # Монтаж
     if length <= 50:
         work_price = 19980 if has_foundation else 13980
     else:
@@ -102,23 +98,24 @@ def generate_pdf(data):
 
     work_total = work_price * length
 
-    pdf.ln(5)
+    pdf.ln(6)
     pdf.set_font('DejaVu', '', 11)
     pdf.multi_cell(0, 8, f"💼 Работы под ключ: {format_currency(work_total)}")
-    pdf.set_font('DejaVu', size=10)
-    pdf.multi_cell(0, 7, """Что входит в стоимость работ:
-- Разметка
-- Подготовка и копка траншей
-- Подсыпка и трамбовка
-- Установка опалубки и помощь по аренде
-- Армирование
-- Заливка фундамента
-- Демонтаж опалубки
-- Монтаж стоек и лаг
-- Крепление профнастила
-- Сварочные работы""")
 
-    # Сохранение PDF
+    pdf.set_font('DejaVu', '', 10)
+    pdf.multi_cell(0, 7, "Что входит в стоимость работ:")
+    pdf.multi_cell(0, 7, "- Разметка")
+    pdf.multi_cell(0, 7, "- Подготовка и копка траншей")
+    pdf.multi_cell(0, 7, "- Подсыпка и трамбовка")
+    pdf.multi_cell(0, 7, "- Установка опалубки и помощь по аренде")
+    pdf.multi_cell(0, 7, "- Армирование")
+    pdf.multi_cell(0, 7, "- Заливка фундамента")
+    pdf.multi_cell(0, 7, "- Демонтаж опалубки")
+    pdf.multi_cell(0, 7, "- Монтаж стоек и лаг")
+    pdf.multi_cell(0, 7, "- Крепление профнастила")
+    pdf.multi_cell(0, 7, "- Сварочные работы")
+
+    # Сохраняем
     os.makedirs("output", exist_ok=True)
     filename = f"./output/kp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     pdf.output(filename)
