@@ -5,8 +5,7 @@ from datetime import datetime
 def generate_pdf(data):
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font('Arial', '', os.path.join(os.path.dirname(__file__), 'Arial.ttf'), uni=True)
-    pdf.set_font('Arial', size=12)
+    pdf.set_font('Helvetica', size=12)
 
     fence_type = data.get("fence_type", "Не указано")
     length = data.get("length", 0)
