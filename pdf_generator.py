@@ -15,19 +15,29 @@ def generate_pdf(data):
     pdf = FPDF()
     pdf.add_page()
 
-    # Добавление шрифтов
+    # Шрифты
     pdf.add_font('DejaVu', '', './fonts/DejaVuSans.ttf', uni=True)
     pdf.add_font('DejaVu', 'B', './fonts/DejaVuSans-Bold.ttf', uni=True)
     pdf.set_font('DejaVu', '', 11)
 
-    # Получение и проверка данных
+    # Данные
     fence_type = safe_get(data, "fence_type", "Не указано")
     try:
         length = float(safe_get(data, "length", 0) or 0)
     except (ValueError, TypeError):
         length = 0
-    has_foundation = bool(safe_get(data, "foundation", False))
-    slope = bool(safe_get(data, "slope", False))
+    has_foundation = safe_get(data, "foundation", False)
+    slope = safe_get(data, "slope", False)
+
+    # Заголовок
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(200, 10, txt="Коммерческое предложение", ln=True, align="C")
+    pdf.ln(8)
+    pdf.cell(200, 10, txt=f"Тип забора: {fence_type}", ln=True)
+    pdf.cell(200, 10, txt=f"Длина: {length} м", ln=True)
+    pdf.cell(200, 10, txt=f"Фундамент: {'Да' if has_foundation else 'Нет'}", ln=True)
+    pdf.cell(200, 10, txt=f"Уклон: {'Да' if slope else 'Нет'}", ln=True)
+    pdf.ln(5)
 
     # Цены
     PROFNASTIL_PRICE = 2300
@@ -54,17 +64,7 @@ def generate_pdf(data):
 
     total_material = sheets_total + lag_total + stake_total + screws_total + concrete_total
 
-    # Заголовок
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(200, 10, txt="Коммерческое предложение", ln=True, align="C")
-    pdf.ln(8)
-    pdf.cell(200, 10, txt=f"Тип забора: {fence_type}", ln=True)
-    pdf.cell(200, 10, txt=f"Длина: {length} м", ln=True)
-    pdf.cell(200, 10, txt=f"Фундамент: {'Да' if has_foundation else 'Нет'}", ln=True)
-    pdf.cell(200, 10, txt=f"Уклон: {'Да' if slope else 'Нет'}", ln=True)
-    pdf.ln(5)
-
-    # Таблица материалов
+    # Таблица
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font('DejaVu', 'B', 11)
     pdf.cell(60, 10, "Материал", 1, 0, 'C', True)
@@ -73,64 +73,59 @@ def generate_pdf(data):
     pdf.cell(50, 10, "Сумма", 1, 1, 'C', True)
     pdf.set_font('DejaVu', '', 11)
 
-    pdf.cell(60, 10, "Профнастил", 1)
-    pdf.cell(40, 10, f"{sheets_count} лист.", 1)
-    pdf.cell(40, 10, format_currency(PROFNASTIL_PRICE), 1)
-    pdf.cell(50, 10, format_currency(sheets_total), 1, ln=True)
-
-    pdf.cell(60, 10, "Лаги", 1)
-    pdf.cell(40, 10, f"{int(lag_length)} м", 1)
-    pdf.cell(40, 10, format_currency(LAG_PRICE), 1)
-    pdf.cell(50, 10, format_currency(lag_total), 1, ln=True)
-
-    pdf.cell(60, 10, "Стойки", 1)
-    pdf.cell(40, 10, f"{stake_count} шт", 1)
-    pdf.cell(40, 10, format_currency(STAKE_PRICE), 1)
-    pdf.cell(50, 10, format_currency(stake_total), 1, ln=True)
-
-    pdf.cell(60, 10, "Саморезы", 1)
-    pdf.cell(40, 10, "1 пачка", 1)
-    pdf.cell(40, 10, format_currency(SCREWS_PACK_PRICE), 1)
-    pdf.cell(50, 10, format_currency(screws_total), 1, ln=True)
+    rows = [
+        ("Профнастил", f"{sheets_count} лист.", PROFNASTIL_PRICE, sheets_total),
+        ("Лаги", f"{int(lag_length)} м", LAG_PRICE, lag_total),
+        ("Стойки", f"{stake_count} шт", STAKE_PRICE, stake_total),
+        ("Саморезы", "1 пачка", SCREWS_PACK_PRICE, screws_total)
+    ]
 
     if has_foundation:
-        pdf.cell(60, 10, "Бетон", 1)
-        pdf.cell(40, 10, f"{concrete_m3:.2f} м³", 1)
-        pdf.cell(40, 10, format_currency(CONCRETE_PRICE_M3), 1)
-        pdf.cell(50, 10, format_currency(concrete_total), 1, ln=True)
+        rows.append(("Бетон", f"{concrete_m3:.2f} м³", CONCRETE_PRICE_M3, concrete_total))
+
+    for name, qty, unit_price, total in rows:
+        pdf.cell(60, 10, name, 1)
+        pdf.cell(40, 10, qty, 1)
+        pdf.cell(40, 10, format_currency(unit_price), 1)
+        pdf.cell(50, 10, format_currency(total), 1)
+        pdf.ln(10)
 
     pdf.set_font('DejaVu', 'B', 11)
     pdf.cell(140, 10, "Итого за материалы:", 1)
     pdf.cell(50, 10, format_currency(total_material), 1, ln=True)
 
-    # Расчет стоимости работ
+    # Стоимость работ
     if length <= 50:
         work_price = 19980 if has_foundation else 13980
     else:
         work_price = 13980 if has_foundation else 9900
     if slope:
         work_price *= 1.1
+
     work_total = work_price * length
 
     pdf.ln(5)
     pdf.set_font('DejaVu', '', 11)
     pdf.multi_cell(0, 8, f"💼 Работы под ключ: {format_currency(work_total)}")
 
-    # Детализация работ
     pdf.set_font('DejaVu', size=10)
-    pdf.multi_cell(0, 6, "Что входит в стоимость работ:\n"
-                         "- Разметка\n"
-                         "- Подготовка и копка траншей\n"
-                         "- Подсыпка и трамбовка\n"
-                         "- Установка опалубки и помощь по аренде\n"
-                         "- Армирование\n"
-                         "- Заливка фундамента\n"
-                         "- Демонтаж опалубки\n"
-                         "- Монтаж стоек и лаг\n"
-                         "- Крепление профнастила\n"
-                         "- Сварочные работы")
+    lines = [
+        "Что входит в стоимость работ:",
+        "- Разметка",
+        "- Подготовка и копка траншей",
+        "- Подсыпка и трамбовка",
+        "- Установка опалубки и помощь по аренде",
+        "- Армирование",
+        "- Заливка фундамента",
+        "- Демонтаж опалубки",
+        "- Монтаж стоек и лаг",
+        "- Крепление профнастила",
+        "- Сварочные работы"
+    ]
+    for line in lines:
+        pdf.multi_cell(0, 6, line)
 
-    # Сохранение
+    # Сохраняем
     os.makedirs("output", exist_ok=True)
     filename = f"./output/kp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     pdf.output(filename)
