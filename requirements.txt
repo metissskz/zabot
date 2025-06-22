@@ -2,4 +2,4 @@ aiogram==3.4.1
 aiohttp
 python-dotenv
 reportlab
-fpdf==1.7.2
+fpdf2
