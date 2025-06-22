@@ -8,23 +8,27 @@ def format_currency(value):
     except (ValueError, TypeError):
         return "—"
 
+# 🔐 Безопасный get
+def safe_get(data, key, default=None):
+    return data[key] if key in data else default
+
 def generate_pdf(data):
     pdf = FPDF()
     pdf.add_page()
 
-    # Добавляем шрифты
+    # Шрифты
     pdf.add_font('DejaVu', '', './fonts/DejaVuSans.ttf', uni=True)
     pdf.add_font('DejaVu', 'B', './fonts/DejaVuSans-Bold.ttf', uni=True)
     pdf.set_font('DejaVu', '', 11)
 
-    # Безопасно извлекаем данные
-    fence_type = data.get("fence_type", "Не указано")
+    # ⚠ Безопасные извлечения
+    fence_type = safe_get(data, "fence_type", "Не указано")
     try:
-        length = float(data.get("length", 0) or 0)
+        length = float(safe_get(data, "length", 0) or 0)
     except (ValueError, TypeError):
         length = 0
-    has_foundation = data.get("foundation", False)
-    slope = data.get("slope", False)
+    has_foundation = safe_get(data, "foundation", False)
+    slope = safe_get(data, "slope", False)
 
     # Заголовок
     pdf.set_text_color(0, 0, 0)
@@ -100,7 +104,7 @@ def generate_pdf(data):
     pdf.cell(140, 10, "Итого за материалы:", 1)
     pdf.cell(50, 10, format_currency(total_material), 1, 1)
 
-    # Работы
+    # Стоимость работ
     if length <= 50:
         work_price = 19980 if has_foundation else 13980
     else:
