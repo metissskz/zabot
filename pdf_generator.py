@@ -8,14 +8,19 @@ def format_currency(value):
 def generate_pdf(data):
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font('DejaVu', '', './fonts/DejaVuSans.ttf', uni=True)
-    pdf.set_font('DejaVu', size=11)
 
+    # Добавление шрифтов
+    pdf.add_font('DejaVu', '', './fonts/DejaVuSans.ttf', uni=True)
+    pdf.add_font('DejaVu', 'B', './fonts/DejaVuSans-Bold.ttf', uni=True)
+    pdf.set_font('DejaVu', '', 11)
+
+    # Получение данных
     fence_type = data.get("fence_type", "Не указано")
     length = float(data.get("length", 0))
     has_foundation = data.get("foundation", False)
     slope = data.get("slope", False)
 
+    # Заголовок
     pdf.set_text_color(0, 0, 0)
     pdf.cell(200, 10, txt="Коммерческое предложение", ln=True, align="C")
     pdf.ln(8)
@@ -73,7 +78,7 @@ def generate_pdf(data):
     pdf.cell(50, 10, format_currency(stake_total), 1, 1)
 
     pdf.cell(60, 10, "Саморезы", 1)
-    pdf.cell(40, 10, f"1 пачка", 1)
+    pdf.cell(40, 10, "1 пачка", 1)
     pdf.cell(40, 10, format_currency(SCREWS_PACK_PRICE), 1)
     pdf.cell(50, 10, format_currency(screws_total), 1, 1)
 
@@ -113,6 +118,7 @@ def generate_pdf(data):
 - Крепление профнастила
 - Сварочные работы""")
 
+    # Сохранение PDF
     os.makedirs("output", exist_ok=True)
     filename = f"./output/kp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     pdf.output(filename)
