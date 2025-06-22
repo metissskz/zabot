@@ -25,8 +25,7 @@ main_menu = ReplyKeyboardMarkup(
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "Привет! Я бот ZaborOFF — помогу рассчитать забор и сформировать КП."
-Выберите действие:",
+        "Привет! Я бот ZaborOFF — помогу рассчитать забор и сформировать КП.\n\nВыберите действие:",
         reply_markup=main_menu
     )
 
