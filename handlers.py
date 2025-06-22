@@ -104,7 +104,7 @@ async def finish_calc(message: types.Message, state: FSMContext):
     # Профнастил
     prof_sheet_width = 1.1
     num_sheets = int(length / prof_sheet_width) + 1
-    prof_price = 14000
+    prof_price = 2300
     total_prof = num_sheets * prof_price
 
     # Саморезы
