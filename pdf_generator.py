@@ -21,6 +21,7 @@ def generate_pdf(data):
     pdf.cell(200, 10, txt=f"Уклон: {'Да' if slope else 'Нет'}", ln=True)
     pdf.ln(10)
 
+    # Расчёты
     PROFNASTIL_PRICE = 2300
     PROFILE_WIDTH = 1.1
     PROFILE_HEIGHT = 2
@@ -67,7 +68,6 @@ def generate_pdf(data):
     pdf.ln(5)
     pdf.cell(200, 10, txt=f"💼 Работы под ключ: {int(work_total):,} ₸", ln=True)
     pdf.ln(10)
-
     pdf.multi_cell(0, 10, txt="""В стоимость входит:
 - Разметка
 - Подготовка траншеи
@@ -78,13 +78,11 @@ def generate_pdf(data):
 - Монтаж и демонтаж опалубки
 - Монтаж забора, сварочные работы
 """)
-
     pdf.set_font("Arial", size=10)
     pdf.cell(0, 10, txt="ZaborOFF — расчет и монтаж заборов", align="C")
 
-    # Создаём папку "output", если её нет
-    os.makedirs("./output", exist_ok=True)
-
+    # Создание папки, если не существует
+    os.makedirs("output", exist_ok=True)
     filename = f"./output/kp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     pdf.output(filename)
     return filename
