@@ -5,7 +5,10 @@ from datetime import datetime
 def generate_pdf(data):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font('Helvetica', size=12)
+
+    # ✅ Подключаем кириллический шрифт
+    pdf.add_font('DejaVu', '', './fonts/DejaVuSans.ttf', uni=True)
+    pdf.set_font('DejaVu', size=12)
 
     fence_type = data.get("fence_type", "Не указано")
     length = data.get("length", 0)
@@ -21,10 +24,9 @@ def generate_pdf(data):
     pdf.cell(200, 10, txt=f"Уклон: {'Да' if slope else 'Нет'}", ln=True)
     pdf.ln(10)
 
-    # Расчёты
+    # 🔢 Расчёты
     PROFNASTIL_PRICE = 2300
     PROFILE_WIDTH = 1.1
-    PROFILE_HEIGHT = 2
     SHEETS_COUNT = int((length / PROFILE_WIDTH) + 0.5)
     sheets_price = SHEETS_COUNT * PROFNASTIL_PRICE
 
@@ -57,6 +59,7 @@ def generate_pdf(data):
     pdf.ln(10)
     pdf.cell(200, 10, txt=f"💰 Итого за материалы: {int(total_material):,} ₸", ln=True)
 
+    # 💼 Расчёт стоимости работ
     if length <= 50:
         work_price = 19980 if has_foundation else 13980
     else:
@@ -78,10 +81,10 @@ def generate_pdf(data):
 - Монтаж и демонтаж опалубки
 - Монтаж забора, сварочные работы
 """)
-    pdf.set_font("Arial", size=10)
+    pdf.set_font("DejaVu", size=10)
     pdf.cell(0, 10, txt="ZaborOFF — расчет и монтаж заборов", align="C")
 
-    # Создание папки, если не существует
+    # ✅ Создаём папку, если не существует
     os.makedirs("output", exist_ok=True)
     filename = f"./output/kp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     pdf.output(filename)
