@@ -45,14 +45,19 @@ async def contact_us(message: types.Message):
 @router.message(F.text == "📄 Получить PDF")
 async def get_pdf(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    if not data:
-        await message.answer("Сначала рассчитайте забор 📐")
+    required_fields = ["fence_type", "length", "foundation", "slope"]
+
+    # Проверка, есть ли все нужные поля
+    if not all(k in data for k in required_fields):
+        await message.answer("❗️Недостаточно данных. Сначала рассчитайте забор 📐")
         return
+
     try:
         file_path = generate_pdf(data)
         await message.answer_document(types.FSInputFile(file_path), caption="📄 Ваше коммерческое предложение")
     except Exception as e:
         await message.answer(f"❌ Ошибка при генерации PDF: {e}")
+
     await message.answer("Что дальше?", reply_markup=main_menu)
 
 @router.message(F.text == "📐 Рассчитать забор")
@@ -103,6 +108,8 @@ async def ask_slope(message: types.Message, state: FSMContext):
     await message.answer("✅ Данные приняты. Формирую расчёт...")
 
     data = await state.get_data()
+    print("📦 Данные для PDF:", data)  # Лог для отладки
+
     try:
         file_path = generate_pdf(data)
         await message.answer_document(types.FSInputFile(file_path), caption="📄 Ваше коммерческое предложение")
