@@ -1,10 +1,9 @@
 from aiogram import Router, F, types
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from states import FenceCalc
 from pdf_generator import generate_pdf
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-import os
 
 router = Router()
 
@@ -21,10 +20,9 @@ main_menu = ReplyKeyboardMarkup(
     input_field_placeholder="Выберите действие:"
 )
 
+# Кнопки Да / Нет
 yes_no_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="Да"), KeyboardButton(text="Нет")]
-    ],
+    keyboard=[[KeyboardButton(text="Да"), KeyboardButton(text="Нет")]],
     resize_keyboard=True
 )
 
@@ -50,8 +48,11 @@ async def get_pdf(message: types.Message, state: FSMContext):
     if not data:
         await message.answer("Сначала рассчитайте забор 📐")
         return
-    file_path = generate_pdf(data)
-    await message.answer_document(types.FSInputFile(file_path), caption="📄 Ваше коммерческое предложение")
+    try:
+        file_path = generate_pdf(data)
+        await message.answer_document(types.FSInputFile(file_path), caption="📄 Ваше коммерческое предложение")
+    except Exception as e:
+        await message.answer(f"❌ Ошибка при генерации PDF: {e}")
     await message.answer("Что дальше?", reply_markup=main_menu)
 
 @router.message(F.text == "📐 Рассчитать забор")
@@ -76,7 +77,7 @@ async def enter_length(message: types.Message, state: FSMContext):
     try:
         length = float(message.text)
         await state.update_data(length=length)
-        await message.answer("Будет ли ленточный фундамент? (Да/Нет)", reply_markup=yes_no_kb)
+        await message.answer("Будет ли ленточный фундамент?", reply_markup=yes_no_kb)
         await state.set_state(FenceCalc.foundation)
     except ValueError:
         await message.answer("Введите число, например: 50")
@@ -87,9 +88,8 @@ async def ask_foundation(message: types.Message, state: FSMContext):
     if answer not in ("да", "нет"):
         await message.answer("Пожалуйста, нажмите кнопку Да или Нет.", reply_markup=yes_no_kb)
         return
-    has_foundation = answer == "да"
-    await state.update_data(foundation=has_foundation)
-    await message.answer("Есть ли уклон на участке? (Да/Нет)", reply_markup=yes_no_kb)
+    await state.update_data(foundation=(answer == "да"))
+    await message.answer("Есть ли уклон на участке?", reply_markup=yes_no_kb)
     await state.set_state(FenceCalc.slope)
 
 @router.message(FenceCalc.slope)
@@ -98,11 +98,15 @@ async def ask_slope(message: types.Message, state: FSMContext):
     if answer not in ("да", "нет"):
         await message.answer("Пожалуйста, нажмите кнопку Да или Нет.", reply_markup=yes_no_kb)
         return
-    slope = answer == "да"
-    await state.update_data(slope=slope)
+    await state.update_data(slope=(answer == "да"))
 
-    await message.answer("✅ Данные приняты. Формирую расчёт...", reply_markup=main_menu)
+    await message.answer("✅ Данные приняты. Формирую расчёт...")
 
     data = await state.get_data()
-    file_path = generate_pdf(data)
-    await message.answer_document(types.FSInputFile(file_path), caption="📄 Ваше коммерческое предложение")
+    try:
+        file_path = generate_pdf(data)
+        await message.answer_document(types.FSInputFile(file_path), caption="📄 Ваше коммерческое предложение")
+    except Exception as e:
+        await message.answer(f"❌ Ошибка при генерации PDF: {e}")
+
+    await message.answer("Что дальше?", reply_markup=main_menu)
