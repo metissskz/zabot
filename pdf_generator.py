@@ -15,17 +15,17 @@ def generate_pdf(data):
     pdf = FPDF()
     pdf.add_page()
 
-    # ✅ Добавляем шрифты
+    # ✅ Добавляем шрифты (DejaVuSans.ttf и DejaVuSans-Bold.ttf должны быть в папке fonts/)
     pdf.add_font("DejaVu", "", "./fonts/DejaVuSans.ttf", uni=True)
     pdf.add_font("DejaVu", "B", "./fonts/DejaVuSans-Bold.ttf", uni=True)
     pdf.set_font("DejaVu", "", 11)
 
-    # ✅ Добавим логотип (если есть)
+    # ✅ Логотип (если есть)
     logo_path = "./logo.png"
     if os.path.exists(logo_path):
         pdf.image(logo_path, x=10, y=8, w=30)
 
-    # ✅ Реквизиты компании
+    # ✅ Реквизиты
     pdf.set_xy(140, 10)
     pdf.set_font("DejaVu", "", 9)
     pdf.multi_cell(60, 5, "ZaborOFF.kz\nСамал-2, ул. Бектурова, 77а\nг. Алматы, Казахстан\n+7 702 231 91 76", align="R")
@@ -33,8 +33,9 @@ def generate_pdf(data):
     pdf.ln(25)
     pdf.set_font("DejaVu", "B", 13)
     pdf.cell(0, 10, "Коммерческое предложение", ln=True, align="C")
-
     pdf.set_font("DejaVu", "", 11)
+
+    # Данные
     fence_type = safe_get(data, "fence_type", "Не указано")
     try:
         length = float(safe_get(data, "length", 0) or 0)
@@ -50,14 +51,14 @@ def generate_pdf(data):
     pdf.cell(0, 8, f"Уклон: {'Да' if slope else 'Нет'}", ln=True)
     pdf.ln(5)
 
-    # 🔢 Цены
+    # Цены
     PROFNASTIL_PRICE = 2300
     LAG_PRICE = 800
     STAKE_PRICE = 1500 * 2.5
     SCREWS_PACK_PRICE = 2000
     CONCRETE_PRICE_M3 = 22000
 
-    # 🔧 Расчёты
+    # Расчёты
     profile_width = 1.1
     sheets_count = int(length / profile_width + 0.5)
     lag_length = length * 3
@@ -71,7 +72,7 @@ def generate_pdf(data):
     concrete_total = concrete_m3 * CONCRETE_PRICE_M3
     total_material = sheets_total + lag_total + stake_total + screws_total + concrete_total
 
-    # 📊 Таблица
+    # Таблица
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font("DejaVu", "B", 11)
     pdf.cell(60, 10, "Материал", 1, 0, "C", True)
@@ -98,7 +99,7 @@ def generate_pdf(data):
     pdf.cell(140, 10, "Итого за материалы:", 1)
     pdf.cell(50, 10, format_currency(total_material), 1, ln=True)
 
-    # 👷 Стоимость работ
+    # Работы
     pdf.ln(5)
     if length <= 50:
         work_price = 19980 if has_foundation else 13980
@@ -108,7 +109,6 @@ def generate_pdf(data):
         work_price *= 1.1
 
     work_total = work_price * length
-
     pdf.set_font("DejaVu", "", 11)
     pdf.multi_cell(0, 8, f"💼 Работы под ключ: {format_currency(work_total)}")
 
@@ -129,7 +129,6 @@ def generate_pdf(data):
     for line in lines:
         pdf.multi_cell(0, 6, line)
 
-    # 📁 Сохраняем
     os.makedirs("output", exist_ok=True)
     filename = f"./output/kp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     pdf.output(filename)
