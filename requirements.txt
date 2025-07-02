@@ -1,5 +1,8 @@
 aiogram==3.4.1
-aiohttp
+aiohttp==3.9.5
+aiofiles
 python-dotenv
+asyncpg
+fpdf2==2.8.3
 reportlab
-fpdf2
+pillow
