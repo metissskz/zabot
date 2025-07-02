@@ -15,6 +15,7 @@ main_menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="📄 Получить PDF")],
         [KeyboardButton(text="🌐 Открыть сайт")],
         [KeyboardButton(text="📞 Связаться с нами")]
+        [KeyboardButton(text="📦 Мои настройки")]
     ],
     resize_keyboard=True,
     input_field_placeholder="Выберите действие:"
