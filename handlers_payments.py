@@ -1,74 +1,90 @@
-# handlers_payments.py
 from aiogram import Router, F, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-from db import add_pending_payment, get_pending_payments, confirm_payment, reject_payment
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, FSInputFile
+from datetime import datetime, timedelta
 
 router = Router()
 
-ADMINS = [77022319176]  # Замени на свой Telegram ID
+# Простая in-memory "БД" пользователей (в будущем заменить на PostgreSQL)
+USERS = {}  # user_id: {"trial_until": datetime, "access": bool, "is_admin": bool}
 
-@router.message(F.text == "💰 Пополнить баланс")
-async def pay_by_qr(message: types.Message):
-    await message.answer_photo(
-        photo="https://example.com/kaspi_qr.png",  # Заменить на свой QR
-        caption=(
-            "📲 Отсканируйте QR в Kaspi и отправьте чек.
+ADMIN_IDS = [77022319176]  # Добавь сюда свой Telegram user_id
 
-"
-            "💵 Стоимость 1 КП: *200 ₸*
-"
-            "После оплаты напишите: `Оплатил 200` или отправьте фото чека."
-        ),
-        parse_mode="Markdown"
-    )
+TRIAL_DAYS = 1
+PRICE_PER_KP = 200  # тенге
 
-@router.message(F.text.startswith("Оплатил"))
-async def save_payment_request(message: types.Message):
-    amount_str = message.text.replace("Оплатил", "").strip()
-    try:
-        amount = int(amount_str)
-        await add_pending_payment(message.from_user.id, amount, None)
-        await message.answer("✅ Заявка принята. Ожидайте подтверждения админом.")
-    except:
-        await message.answer("❌ Не удалось распознать сумму. Укажите число, например: `Оплатил 200`.")
+# Команда /pay
+@router.message(Command("pay"))
+async def pay_start(message: Message):
+    user_id = message.from_user.id
+    now = datetime.now()
+    user_data = USERS.get(user_id)
 
+    if user_data and user_data.get("access"):
+        await message.answer("✅ У вас уже есть активный доступ.")
+    else:
+        USERS[user_id] = {
+            "trial_until": now + timedelta(days=TRIAL_DAYS),
+            "access": True,
+            "is_admin": user_id in ADMIN_IDS
+        }
+        await message.answer(f"🆓 Вам выдан тестовый доступ на {TRIAL_DAYS} день.\n
+После окончания вы сможете оплатить доступ, отправив чек.")
+
+        await message.answer("💳 Для оплаты доступа переведите 200 ₸ на Kaspi:", reply_markup=types.InlineKeyboardMarkup(
+            inline_keyboard=[
+                [types.InlineKeyboardButton(text="Отправить чек", callback_data="send_receipt")]
+            ]
+        ))
+
+# Обработка отправки чека (фото)
 @router.message(F.photo)
-async def save_payment_photo(message: types.Message):
-    file_id = message.photo[-1].file_id
-    await add_pending_payment(message.from_user.id, 200, file_id)
-    await message.answer("✅ Фото чека получено. Ожидайте подтверждения.")
+async def handle_receipt(message: Message):
+    user_id = message.from_user.id
+    USERS.setdefault(user_id, {})  # если нет данных, создать пустую
 
-@router.message(F.text == "/платежи")
-async def list_payments(message: types.Message):
-    if message.from_user.id not in ADMINS:
-        return
-    payments = await get_pending_payments()
-    if not payments:
-        await message.answer("📬 Нет заявок.")
-        return
-    for p in payments:
-        text = f"📏 Заявка #{p['id']}\n👤 {p['telegram_id']}\n💸 {p['amount']} ₸\n⏰ {p['created_at']}"
-        markup = ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text=f"✅ Подтвердить {p['id']}")],
-                [KeyboardButton(text=f"❌ Отклонить {p['id']}")]
-            ],
-            resize_keyboard=True
-        )
-        await message.answer(text, reply_markup=markup)
+    # Пересылаем фото админу
+    for admin_id in ADMIN_IDS:
+        await message.bot.send_message(admin_id, f"📥 Новый чек от пользователя {user_id}")
+        await message.bot.send_photo(admin_id, photo=message.photo[-1].file_id, caption=f"/approve_{user_id} /deny_{user_id}")
 
-@router.message(F.text.startswith("\u2705 \u041f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044c"))
-async def confirm_payment_cmd(message: types.Message):
-    if message.from_user.id not in ADMINS:
-        return
-    pid = int(message.text.split()[-1])
-    await confirm_payment(pid)
-    await message.answer("\u2705 \u041f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u043e.")
+    await message.answer("🕐 Чек отправлен на проверку. Ожидайте подтверждения.")
 
-@router.message(F.text.startswith("\u274c \u041e\u0442\u043a\u043b\u043e\u043d\u0438\u0442\u044c"))
-async def reject_payment_cmd(message: types.Message):
-    if message.from_user.id not in ADMINS:
+# Обработка подтверждения оплаты (только админ)
+@router.message(F.text.startswith("/approve_"))
+async def approve_payment(message: Message):
+    if message.from_user.id not in ADMIN_IDS:
         return
-    pid = int(message.text.split()[-1])
-    await reject_payment(pid)
-    await message.answer("\u274c \u0417\u0430\u044f\u0432\u043a\u0430 \u043e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u0430.")
+
+    try:
+        target_id = int(message.text.split("_")[1])
+        USERS.setdefault(target_id, {})
+        USERS[target_id]["access"] = True
+        USERS[target_id]["trial_until"] = datetime.now() + timedelta(days=30)
+        await message.answer(f"✅ Доступ пользователю {target_id} выдан на 30 дней.")
+        await message.bot.send_message(target_id, "✅ Ваш платный доступ активирован на 30 дней. Спасибо!")
+    except Exception as e:
+        await message.answer(f"Ошибка при активации: {e}")
+
+# Обработка отклонения
+@router.message(F.text.startswith("/deny_"))
+async def deny_payment(message: Message):
+    if message.from_user.id not in ADMIN_IDS:
+        return
+
+    try:
+        target_id = int(message.text.split("_")[1])
+        await message.bot.send_message(target_id, "❌ Ваш чек был отклонён. Пожалуйста, проверьте данные и отправьте снова.")
+        await message.answer("🚫 Пользователь уведомлён об отказе.")
+    except Exception as e:
+        await message.answer(f"Ошибка при отказе: {e}")
+
+# Пример проверки доступа
+async def has_access(user_id: int) -> bool:
+    user = USERS.get(user_id)
+    if not user:
+        return False
+    if user.get("access") and user.get("trial_until", datetime.min) >= datetime.now():
+        return True
+    return False
