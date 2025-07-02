@@ -1,13 +1,15 @@
-from aiogram import Router, F, types
+from aiogram import Router, types, F
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from states.settings import SettingsFSM
 from db import get_user_settings, update_user_setting, reset_user_settings
-from handlers import main_menu  # 🔄 Импорт вынесен наверх
+import asyncpg
+import os
 
 router = Router()
 
-# 📋 Меню настроек
+# Меню настроек
 settings_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="✏️ Изменить цены"), KeyboardButton(text="🏠 Изменить адрес")],
@@ -17,18 +19,20 @@ settings_menu = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# 🚪 Вход в настройки
+# 📦 Открыть меню настроек
 @router.message(F.text == "📦 Мои настройки")
 async def settings_start(message: types.Message, state: FSMContext):
     await state.set_state(SettingsFSM.choosing_option)
     await message.answer("🔧 Что вы хотите настроить?", reply_markup=settings_menu)
 
-# ✏️ Изменение цен
+# ✏️ Изменить цены
 @router.message(SettingsFSM.choosing_option, F.text == "✏️ Изменить цены")
 async def ask_prices(message: types.Message, state: FSMContext):
     await state.set_state(SettingsFSM.updating_price)
     await message.answer(
-        "Введите новые цены через запятую:\n`профнастил, лаги, стойки, саморезы, бетон`\n\nПример:\n`2300, 800, 3750, 2000, 22000`",
+        "Введите новые цены через запятую:\n"
+        "`профнастил, лаги, стойки, саморезы, бетон`\n\n"
+        "Пример: `2300, 800, 3750, 2000, 22000`",
         reply_markup=ReplyKeyboardRemove()
     )
 
@@ -43,13 +47,13 @@ async def save_prices(message: types.Message, state: FSMContext):
             await update_user_setting(message.from_user.id, k, v)
         await message.answer("✅ Цены обновлены", reply_markup=settings_menu)
         await state.set_state(SettingsFSM.choosing_option)
-    except Exception:
+    except:
         await message.answer("⚠️ Неверный формат. Попробуйте ещё раз.")
 
-# 🏠 Адрес
+# 🏠 Изменить адрес
 @router.message(SettingsFSM.choosing_option, F.text == "🏠 Изменить адрес")
 async def ask_address(message: types.Message, state: FSMContext):
-    await message.answer("Введите новый адрес и контактные данные:", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Введите новый адрес и контактные данные:")
     await state.set_state(SettingsFSM.updating_address)
 
 @router.message(SettingsFSM.updating_address)
@@ -58,10 +62,10 @@ async def save_address(message: types.Message, state: FSMContext):
     await message.answer("✅ Адрес обновлён", reply_markup=settings_menu)
     await state.set_state(SettingsFSM.choosing_option)
 
-# 🖼 Логотип
+# 🖼 Загрузить логотип
 @router.message(SettingsFSM.choosing_option, F.text == "🖼 Загрузить логотип")
 async def ask_logo(message: types.Message, state: FSMContext):
-    await message.answer("📤 Отправьте изображение логотипа (JPG/PNG):", reply_markup=ReplyKeyboardRemove())
+    await message.answer("📤 Отправьте изображение логотипа (JPG/PNG):")
     await state.set_state(SettingsFSM.uploading_logo)
 
 @router.message(SettingsFSM.uploading_logo, F.photo)
@@ -71,7 +75,7 @@ async def save_logo(message: types.Message, state: FSMContext):
     await message.answer("✅ Логотип сохранён", reply_markup=settings_menu)
     await state.set_state(SettingsFSM.choosing_option)
 
-# ♻️ Сброс
+# ♻️ Сбросить настройки
 @router.message(SettingsFSM.choosing_option, F.text == "♻️ Сбросить настройки")
 async def reset_settings(message: types.Message, state: FSMContext):
     await reset_user_settings(message.from_user.id)
@@ -79,6 +83,40 @@ async def reset_settings(message: types.Message, state: FSMContext):
 
 # 🔙 Назад
 @router.message(SettingsFSM.choosing_option, F.text == "🔙 Назад")
-async def back_to_menu(message: types.Message, state: FSMContext):
+async def back(message: types.Message, state: FSMContext):
+    from handlers import main_menu
     await state.clear()
-    await message.answer("🔙 Главное меню:", reply_markup=main_menu)
+    await message.answer("🏠 Главное меню:", reply_markup=main_menu)
+
+# ✅ /init_db (временная команда для создания таблицы)
+@router.message(Command("init_db"))
+async def init_db_command(message: types.Message):
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Только админ может выполнять эту команду.")
+        return
+
+    try:
+        conn = await asyncpg.connect(
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT"),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASS")
+        )
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id BIGINT PRIMARY KEY,
+                profnastil_price INTEGER DEFAULT 2300,
+                lag_price INTEGER DEFAULT 800,
+                stake_price INTEGER DEFAULT 3750,
+                screw_pack_price INTEGER DEFAULT 2000,
+                concrete_price INTEGER DEFAULT 22000,
+                address TEXT DEFAULT 'Zaboroff.kz\nСамал-2, Алматы\n+77022319176',
+                logo_file_id TEXT
+            )
+        """)
+        await conn.close()
+        await message.answer("✅ Таблица user_settings успешно создана.")
+    except Exception as e:
+        await message.answer(f"❌ Ошибка при создании таблицы:\n<code>{e}</code>")
