@@ -18,12 +18,14 @@ WEBHOOK_URL = f"https://{RENDER_HOSTNAME}{WEBHOOK_PATH}"
 bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# Подключение роутеров
+# Подключение всех роутеров
 from handlers import router as main_router
 from handlers.settings import router as settings_router
+from bot_module import router as bot_module_router  # 👉 Добавляем новый модуль
 
 dp.include_router(main_router)
 dp.include_router(settings_router)
+dp.include_router(bot_module_router)  # 👉 Регистрируем новый роутер
 
 # Запуск вебхука
 async def on_startup(app: web.Application):
