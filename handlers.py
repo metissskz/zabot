@@ -14,7 +14,7 @@ main_menu = ReplyKeyboardMarkup(
         [KeyboardButton(text="🧠 Задать вопрос GPT")],
         [KeyboardButton(text="📄 Получить PDF")],
         [KeyboardButton(text="🌐 Открыть сайт")],
-        [KeyboardButton(text="📞 Связаться с нами")]
+        [KeyboardButton(text="📞 Связаться с нами")],
         [KeyboardButton(text="📦 Мои настройки")]
     ],
     resize_keyboard=True,
