@@ -1,11 +1,25 @@
-from aiogram import Router, types
-from aiogram.filters import CommandStart
+import os
+import asyncio
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
+from dotenv import load_dotenv
 
-router = Router()
+# Импорт router из handlers
+from handlers.handlers import router
 
-@router.message(CommandStart())
-async def start_command(message: types.Message):
-    await message.answer("Привет! Я бот ZaborOFF. Готов к расчётам!")
-@router.message()
-async def echo_message(message: types.Message):
-    await message.answer(f"Вы написали: {message.text}")
+load_dotenv()
+TOKEN = os.getenv("BOT_TOKEN")
+
+async def main():
+    bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
+    dp = Dispatcher(storage=MemoryStorage())
+
+    # Подключаем маршруты
+    dp.include_router(router)
+
+    print("🤖 Бот запущен и готов к работе.")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
