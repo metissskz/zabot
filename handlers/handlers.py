@@ -2,8 +2,11 @@ from aiogram import Router, F, types
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-from states import FenceCalc
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import ContentType
+from states import FenceCalc, Settings
 from pdf_generator import generate_pdf
+import os
 
 router = Router()
 
@@ -102,12 +105,8 @@ async def ask_slope(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, нажмите кнопку Да или Нет.", reply_markup=yes_no_kb)
         return
     await state.update_data(slope=(answer == "да"))
-
     await message.answer("✅ Данные приняты. Формирую расчёт...")
-
     data = await state.get_data()
-    print("📦 Данные для PDF:", data)  # Лог для отладки
-
     try:
         file_path = generate_pdf(data)
         await message.answer_document(types.FSInputFile(file_path), caption="📄 Ваше коммерческое предложение")
