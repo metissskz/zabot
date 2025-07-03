@@ -7,7 +7,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
 from db import UserDB  # Новый файл с логикой монетизации
-from handlers_monetization import router  # Обновлённый handlers.py с оплатой
+from handlers import router  # Обновлённый handlers.py с оплатой
 
 # 🛠 Загрузка конфигурации
 TOKEN = os.getenv("BOT_TOKEN")
