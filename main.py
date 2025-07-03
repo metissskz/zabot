@@ -1,24 +1,26 @@
 import os
-from aiogram import Bot, Dispatcher, F
+import asyncio
+from aiogram import Bot, Dispatcher, F, Router
 from aiogram.types import Message, CallbackQuery
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram import Router
 from aiogram.filters import CommandStart
 from dotenv import load_dotenv
 
+# Загрузка переменных окружения
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
+# Инициализация бота и диспетчера
 bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher(storage=MemoryStorage())
 router = Router()
 dp.include_router(router)
 
+# Состояния
 class Form(StatesGroup):
     with_fundament = State()
     spacing = State()
@@ -26,6 +28,7 @@ class Form(StatesGroup):
     slope = State()
     currency = State()
 
+# Хендлеры
 @router.message(CommandStart())
 async def start(message: Message, state: FSMContext):
     await state.clear()
@@ -76,3 +79,7 @@ async def ask_currency(message: Message, state: FSMContext):
 async def complete(message: Message, state: FSMContext):
     data = await state.update_data(currency=message.text)
     await message.answer("Спасибо! Вы завершили ввод. Продолжим в следующем шаге...")
+
+# Запуск бота
+if __name__ == "__main__":
+    asyncio.run(dp.start_polling(bot))
