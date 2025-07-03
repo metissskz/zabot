@@ -1,37 +1,52 @@
-import os
+# db.py
+from datetime import datetime, timedelta
 import asyncpg
-from dotenv import load_dotenv
 
-load_dotenv()
+class Database:
+    def __init__(self, dsn):
+        self.dsn = dsn
+        self.pool = None
 
-# Подключение к PostgreSQL через переменную окружения
-DATABASE_URL = os.getenv("DATABASE_URL")
+    async def connect(self):
+        self.pool = await asyncpg.create_pool(dsn=self.dsn)
 
+    async def close(self):
+        await self.pool.close()
 
-# 📥 Получение всех настроек пользователя
-async def get_user_settings(user_id: int) -> dict:
-    conn = await asyncpg.connect(DATABASE_URL)
-    row = await conn.fetchrow("SELECT * FROM user_settings WHERE user_id = $1", user_id)
+    async def get_or_create_user(self, telegram_id):
+        async with self.pool.acquire() as conn:
+            user = await conn.fetchrow("""
+                SELECT * FROM users WHERE telegram_id = $1
+            """, telegram_id)
+            if user:
+                return user
 
-    # Если пользователь не найден — создаём с дефолтными настройками
-    if not row:
-        await conn.execute("INSERT INTO user_settings (user_id) VALUES ($1)", user_id)
-        row = await conn.fetchrow("SELECT * FROM user_settings WHERE user_id = $1", user_id)
+            trial_end = datetime.utcnow() + timedelta(days=7)
+            await conn.execute("""
+                INSERT INTO users (telegram_id, trial_ends_at, is_subscribed, balance, created_at)
+                VALUES ($1, $2, false, 0, now())
+            """, telegram_id, trial_end)
+            return await conn.fetchrow("SELECT * FROM users WHERE telegram_id = $1", telegram_id)
 
-    await conn.close()
-    return dict(row)
+    async def is_trial_active(self, telegram_id):
+        async with self.pool.acquire() as conn:
+            result = await conn.fetchval("""
+                SELECT trial_ends_at > now() FROM users WHERE telegram_id = $1
+            """, telegram_id)
+            return result
 
+    async def get_user(self, telegram_id):
+        async with self.pool.acquire() as conn:
+            return await conn.fetchrow("SELECT * FROM users WHERE telegram_id = $1", telegram_id)
 
-# ✏️ Обновление одного параметра
-async def update_user_setting(user_id: int, key: str, value):
-    conn = await asyncpg.connect(DATABASE_URL)
-    await conn.execute(f"UPDATE user_settings SET {key} = $1 WHERE user_id = $2", value, user_id)
-    await conn.close()
+    async def decrement_balance(self, telegram_id, amount):
+        async with self.pool.acquire() as conn:
+            await conn.execute("""
+                UPDATE users SET balance = balance - $2 WHERE telegram_id = $1
+            """, telegram_id, amount)
 
-
-# 🔁 Сброс настроек до значений по умолчанию
-async def reset_user_settings(user_id: int):
-    conn = await asyncpg.connect(DATABASE_URL)
-    await conn.execute("DELETE FROM user_settings WHERE user_id = $1", user_id)
-    await conn.execute("INSERT INTO user_settings (user_id) VALUES ($1)", user_id)
-    await conn.close()
+    async def set_subscribed(self, telegram_id, status: bool):
+        async with self.pool.acquire() as conn:
+            await conn.execute("""
+                UPDATE users SET is_subscribed = $2 WHERE telegram_id = $1
+            """, telegram_id, status)
