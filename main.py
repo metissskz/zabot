@@ -1,85 +1,51 @@
 import os
 import asyncio
-from aiogram import Bot, Dispatcher, F, Router
-from aiogram.types import Message, CallbackQuery
-from aiogram.enums import ParseMode
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiohttp import web
+from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart
-from dotenv import load_dotenv
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
-# Загрузка переменных окружения
-load_dotenv()
+from db import UserDB  # Новый файл с логикой монетизации
+from handlers_monetization import router  # Обновлённый handlers.py с оплатой
+
+# 🛠 Загрузка конфигурации
 TOKEN = os.getenv("BOT_TOKEN")
+WEBAPP_HOST = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"https://{WEBAPP_HOST}{WEBHOOK_PATH}"
 
-# Инициализация бота и диспетчера
-bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
+# 🎛 Инициализация бота и dispatcher
+bot = Bot(token=TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
-router = Router()
 dp.include_router(router)
 
-# Состояния
-class Form(StatesGroup):
-    with_fundament = State()
-    spacing = State()
-    length = State()
-    slope = State()
-    currency = State()
+# 💾 Подключение базы данных
+db = UserDB()
 
-# Хендлеры
-@router.message(CommandStart())
-async def start(message: Message, state: FSMContext):
-    await state.clear()
-    kb = ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="🔨 С фундаментом")],
-        [KeyboardButton(text="🛠️ Без фундамента")]
-    ], resize_keyboard=True)
-    await message.answer("Привет! Я бот ZaborOFF. Готов к расчётам!", reply_markup=kb)
-    await state.set_state(Form.with_fundament)
+async def on_startup_web(app: web.Application):
+    # Запуск вебхука на Render
+    await bot.set_webhook(WEBHOOK_URL)
+    print("🚀 Webhook установлен:", WEBHOOK_URL)
+    # Подключение БД
+    await db.connect()
+    await db.init_table()
 
-@router.message(Form.with_fundament)
-async def ask_spacing(message: Message, state: FSMContext):
-    await state.update_data(with_fundament=message.text)
-    kb = ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="2 метра")],
-        [KeyboardButton(text="3 метра")]
-    ], resize_keyboard=True)
-    await message.answer("Выберите расстояние между стойками:", reply_markup=kb)
-    await state.set_state(Form.spacing)
+async def on_shutdown_web(app: web.Application):
+    await bot.delete_webhook()
+    await db.pool.close()
 
-@router.message(Form.spacing)
-async def ask_length(message: Message, state: FSMContext):
-    await state.update_data(spacing=message.text)
-    await message.answer("Введите длину забора в метрах:")
-    await state.set_state(Form.length)
+# 🌐 Создание веб-приложения (для webhook)
+app = web.Application()
+SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+app.on_startup.append(on_startup_web)
+app.on_shutdown.append(on_shutdown_web)
 
-@router.message(Form.length)
-async def ask_slope(message: Message, state: FSMContext):
-    await state.update_data(length=message.text)
-    kb = ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="Да")],
-        [KeyboardButton(text="Нет")]
-    ], resize_keyboard=True)
-    await message.answer("Есть ли уклон на участке?", reply_markup=kb)
-    await state.set_state(Form.slope)
-
-@router.message(Form.slope)
-async def ask_currency(message: Message, state: FSMContext):
-    await state.update_data(slope=message.text)
-    kb = ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="₸ Тенге")],
-        [KeyboardButton(text="₽ Рубли")]
-    ], resize_keyboard=True)
-    await message.answer("Выберите валюту:", reply_markup=kb)
-    await state.set_state(Form.currency)
-
-@router.message(Form.currency)
-async def complete(message: Message, state: FSMContext):
-    data = await state.update_data(currency=message.text)
-    await message.answer("Спасибо! Вы завершили ввод. Продолжим в следующем шаге...")
-
-# Запуск бота
 if __name__ == "__main__":
-    asyncio.run(dp.start_polling(bot))
+    # 🧪 Для запуска локальной разработки (polling)
+    async def start_polling():
+        await db.connect()
+        await db.init_table()
+        from aiogram import executor
+        executor.start_polling(dp, skip_updates=True)
+    asyncio.run(start_polling())
