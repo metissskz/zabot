@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from db import UserDB
-from handlers import router  # handlers.py с логикой монетизации
+from handlers.handlers import router  # handlers.py с логикой монетизации
 
 # 🔐 Токен бота
 TOKEN = os.getenv("BOT_TOKEN")
